@@ -1,0 +1,22 @@
+[
+    {
+        "path": "/urlshort",
+        "url": "https://github.com/gophercises/urlshort"
+    },
+    {
+        "path":"/urlshort-final",
+        "url": "https://github.com/gophercises/urlshort/tree/solution"
+    },
+    {
+        "path":"/redirect-local",
+        "url": "local-short"
+    },
+    {
+        "path":"/local-short",
+        "url": "/some/fallback/call"
+    },
+    {
+        "path":"/want-json",
+        "url": "/got/json"
+    }
+]

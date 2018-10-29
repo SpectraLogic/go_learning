@@ -1,36 +1,41 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"log"
 	"net/http"
+	"path"
+	"runtime"
 
 	"go_learning/urlshort"
 )
 
+// Flags
+var (
+	mappingFile = flag.String("map", path.Join(thisFileDir(), "../mappings.json"), "JSON or YAML file shortened path to URL mappings")
+)
+
 func main() {
+	flag.Parse()
 	mux := defaultMux()
 
-	// Build the MapHandler using the mux as the fallback
-	pathsToUrls := map[string]string{
-		"/urlshort-godoc": "https://godoc.org/github.com/gophercises/urlshort",
-		"/yaml-godoc":     "https://godoc.org/gopkg.in/yaml.v2",
-	}
-	mapHandler := urlshort.MapHandler(pathsToUrls, mux)
+	mappingHandler, err := urlshort.LoadHandlerFromFile(*mappingFile, mux)
 
-	// Build the YAMLHandler using the mapHandler as the
-	// fallback
-	yaml := `
-- path: /urlshort
-  url: https://github.com/gophercises/urlshort
-- path: /urlshort-final
-  url: https://github.com/gophercises/urlshort/tree/solution
-`
-	yamlHandler, err := urlshort.YAMLHandler([]byte(yaml), mapHandler)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	fmt.Println("Starting the server on :8080")
-	http.ListenAndServe(":8080", yamlHandler)
+	http.ListenAndServe(":8080", mappingHandler)
+}
+
+// thisFileDir returns the directory of this go file
+func thisFileDir() string {
+	_, filename, _, ok := runtime.Caller(1)
+	if !ok {
+		return ""
+	}
+	return path.Dir(filename)
 }
 
 func defaultMux() *http.ServeMux {
