@@ -6,14 +6,12 @@ import (
 	"os"
 )
 
-/*
-	Read in the quiz from file, start it, wait for user or timer and then print results.
-*/
+// Read in the quiz from file, start it, wait for user or timer and then print results.
 func main() {
 	newQuiz, err := quiz.NewQuiz("problems.csv")
 	errorHandler(err)
 
-	newQuiz, err = newQuiz.Start(30)
+	err = newQuiz.Start(30)
 	errorHandler(err)
 
 	fmt.Println("\n" + newQuiz.Results())

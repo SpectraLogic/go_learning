@@ -135,7 +135,7 @@ func isLowerAlpha(r rune) bool {
 	return r >= 'a' && r <= 'z'
 }
 
-// in main
+// in cmd
 ret := ""
 for _, r := range input {
   switch {

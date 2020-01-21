@@ -1,9 +1,7 @@
 package quiz
 
-/*
-	Question represents each the individual elements of a quiz. It stores the users answer and whether that answer
-	is correct.
-*/
+// Question represents each the individual elements of a quiz. It stores the users answer and whether that answer
+// is correct.
 type Question struct {
 	QuestionText string
 	Answer       string
@@ -11,26 +9,15 @@ type Question struct {
 	Correct      *bool
 }
 
-/*
-	Creates a new question using the given questionText and answer.
-	UserAnswer is initially stored as "<empty>" and the Correct pointer is initially stored as nil.
-	These values are updated when a quiz is taken.
-*/
-func NewQuestion(ques string, ans string) Question {
-	question := Question{ques, ans, "<empty>", nil}
-	return question
-}
-
-/*
-	Returns a string representation of a Question
-*/
+// String returns a string representation of a Question
 func (q Question) String() string {
 	var resultBox string
-	if q.Correct == nil {
+	switch {
+	case q.Correct == nil:
 		resultBox = "[   ]"
-	} else if *q.Correct {
+	case *q.Correct:
 		resultBox = "[ √ ]"
-	} else {
+	default:
 		resultBox = "[ X ]"
 	}
 
