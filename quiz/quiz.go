@@ -133,11 +133,6 @@ func takeAndTimeQuiz(q *Quiz, maxQuizTime int, c chan string) string {
 	reader := bufio.NewReader(os.Stdin)
 	_, _ = reader.ReadString('\n')
 
-	// We'll return the first thing down this channel, whether it be the maxQuizTime result or the quiz result. Either way, a
-	// pointer to the quiz will be returned so that partial credit can be given.
-	ch := make(chan string)
-	ch = c
-
 	// start the maxQuizTime
 	fmt.Printf("Starting maxQuizTime for %v seconds.\n", maxQuizTime)
 	quizTimer := time.NewTimer(time.Duration(maxQuizTime) * time.Second)
@@ -148,7 +143,7 @@ func takeAndTimeQuiz(q *Quiz, maxQuizTime int, c chan string) string {
 	go func() {
 		<-quizTimer.C
 		fmt.Println("\nTimer has run out!")
-		ch <- "timeout"
+		c <- "timeout"
 	}()
 
 	// this goroutine performs the quiz, asking the user questions and gathering responses. When it finishes, it sends
@@ -173,10 +168,10 @@ func takeAndTimeQuiz(q *Quiz, maxQuizTime int, c chan string) string {
 				q.Questions[index] = value
 			}
 		}
-		ch <- "success"
+		c <- "success"
 	}()
 
-	return <-ch
+	return <-c
 }
 
 
