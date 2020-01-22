@@ -13,7 +13,6 @@ import (
 	"math/rand"
 	"os"
 	"strings"
-	"text/tabwriter"
 	"time"
 )
 
@@ -46,7 +45,7 @@ func NewQuiz(filename string) (*Quiz, error) {
 
 	reader := csv.NewReader(bufio.NewReader(csvFile))
 
-	questions := make([]Question, 0, 100)
+	var questions []Question
 	// loop until end of file or error is reached
 	for {
 		record, ioErr := reader.Read()
@@ -64,47 +63,12 @@ func NewQuiz(filename string) (*Quiz, error) {
 		})
 	}
 
-	q := Quiz{
+	return &Quiz{
 		Questions:        questions,
 		Filename:         filename,
 		TotalQuestions:   len(questions),
 		CorrectQuestions: 0,
-	}
-
-	return &q, err
-}
-
-// Print prints a quiz to stdout with nicely aligned columns thanks to the tabWriter package. Useful for debugging.
-func (q Quiz) Print() (err error) {
-	fmt.Println("\nQuiz - ", q.Filename)
-	w := new(tabwriter.Writer)
-	w.Init(os.Stdout, 0, 8, 2, '\t', tabwriter.AlignRight)
-	_, err = fmt.Fprintln(w, "Question\tAnswer\tUser Answer\tCorrect")
-	if err != nil {
-		return err
-	}
-
-	for index, value := range q.Questions {
-		quest := q.Questions[index]
-		if quest.QuestionText != "" {
-			_, err = fmt.Fprintln(w, value)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	_, err = fmt.Fprintln(w)
-	if err != nil {
-		return err
-	}
-
-	err = w.Flush()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	}, err
 }
 
 // Start begins the user-input portion of the quiz. Each Question is presented to the user and they enter answers via
@@ -120,7 +84,12 @@ func (q *Quiz) Start(maxQuizTime time.Duration, random bool) error {
 	}
 
 	c := make(chan string)
-	go timeQuiz(maxQuizTime, c)
+
+	time.AfterFunc(maxQuizTime, func() {
+		fmt.Println("\nTimer has run out!")
+		c <- "timeout"
+	})
+
 	if random {
 		go proctorRandomQuiz(q, reader, c)
 	} else {
@@ -134,16 +103,6 @@ func (q *Quiz) Start(maxQuizTime time.Duration, random bool) error {
 			maxQuizTime)
 		return errors.New(errorText)
 	}
-}
-
-// timeQuiz waits on the maxQuizTime and sends a "timeout" string down the channel when it is expired.
-// takeAndTimeQuiz returns the first thing down the channel, so the maxQuizTime will 'interrupt' the quiz if
-// it's still going
-func timeQuiz(maxQuizTime time.Duration, c chan string) {
-	time.AfterFunc(maxQuizTime, func() {
-		fmt.Println("\nTimer has run out!")
-		c <- "timeout"
-	})
 }
 
 // proctorQuiz performs the quiz, asking the user questions and gathering responses. When it finishes, it sends
