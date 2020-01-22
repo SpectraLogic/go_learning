@@ -25,7 +25,6 @@ type Quiz struct {
 	CorrectQuestions int
 }
 
-
 // NewQuiz creates a new Quiz struct based on the information in the file at the given file name
 func NewQuiz(filename string) (*Quiz, error) {
 	fmt.Println("\nGetting quiz using file:\t", filename)
@@ -46,7 +45,7 @@ func NewQuiz(filename string) (*Quiz, error) {
 
 	reader := csv.NewReader(bufio.NewReader(csvFile))
 
-	questions := make([]Question, 100)
+	questions := make([]Question, 0, 100)
 	// loop until end of file or error is reached
 	for {
 		record, ioErr := reader.Read()
@@ -61,8 +60,6 @@ func NewQuiz(filename string) (*Quiz, error) {
 		questions = append(questions, Question{
 			QuestionText: record[0],
 			Answer:       record[1],
-			UserAnswer:   "empty",
-			Correct:      nil,
 		})
 	}
 
@@ -112,68 +109,70 @@ func (q Quiz) Print() (err error) {
 // Start begins the user-input portion of the quiz. Each Question is presented to the user and they enter answers via
 // stdin with "\n" being used to specify the end of an answer.
 func (q *Quiz) Start(maxQuizTime int) error {
-	var err error
-
-	c := make(chan string)
-	successString := takeAndTimeQuiz(q, maxQuizTime, c)
-	if successString == "success" {
-		return err
-	} else {
-		return errors.New("quiz timed out before user completed it")
-	}
-}
-
-// takeAndTimeQuiz proctors the quiz, asking the user questions and saving the responses.
-// A Quiz pointer is used as input and output so we can be sure we're looking at the same quiz and not a copy.
-// timer is the time in seconds to allow the quiz to run for. If the user doesn't finish in time, the rest of the answers
-// are considered incorrect.
-func takeAndTimeQuiz(q *Quiz, maxQuizTime int, c chan string) string {
 	fmt.Printf("\nYou will have %v seconds to answer %v questions.\nPress [Enter] to Start the quiz.\n",
 		maxQuizTime, q.TotalQuestions)
+
 	reader := bufio.NewReader(os.Stdin)
-	_, _ = reader.ReadString('\n')
+	_, err := reader.ReadString('\n')
+	if err != nil {
+		return err
+	}
 
 	// start the maxQuizTime
-	fmt.Printf("Starting maxQuizTime for %v seconds.\n", maxQuizTime)
+	fmt.Printf("Starting timer for %v seconds.\n", maxQuizTime)
 	quizTimer := time.NewTimer(time.Duration(maxQuizTime) * time.Second)
 	defer quizTimer.Stop()
 
-	// this goroutine waits on the maxQuizTime and sends a "timeout" string down the channel when it is expired.
-	// takeAndTimeQuiz returns the first thing down the channel, so the maxQuizTime will 'interrupt' the quiz if it's still going
-	go func() {
-		<-quizTimer.C
-		fmt.Println("\nTimer has run out!")
-		c <- "timeout"
-	}()
+	c := make(chan string)
+	go timeQuiz(quizTimer, c)
+	go proctorQuiz(q, reader, c)
 
-	// this goroutine performs the quiz, asking the user questions and gathering responses. When it finishes, it sends
-	// a "success" message down the channel to be returned to the calling function
-	go func() {
-		for index, value := range q.Questions {
-			if value.QuestionText != "" {
-				fmt.Print("\n\tQuestion ", index + 1, ":")
-				fmt.Print("\t\t" + value.QuestionText + " = ")
-
-				savedAnswer, _ := reader.ReadString('\n')
-				savedAnswer = strings.Replace(savedAnswer, "\n", "", 1)
-				result := savedAnswer == value.Answer
-				if result {
-					fmt.Println("\tCorrect!")
-					q.CorrectQuestions++
-				} else {
-					fmt.Println("\tIncorrect.")
-				}
-				value.Correct = &result
-				value.UserAnswer = savedAnswer
-				q.Questions[index] = value
-			}
-		}
-		c <- "success"
-	}()
-
-	return <-c
+	if <-c == "success" {
+		return nil
+	} else {
+		errorText := fmt.Sprintf("The quiz timer (%v seconds) ran out before the user completed the quiz",
+			maxQuizTime)
+		return errors.New(errorText)
+	}
 }
 
+// timeQuiz waits on the maxQuizTime and sends a "timeout" string down the channel when it is expired.
+// takeAndTimeQuiz returns the first thing down the channel, so the maxQuizTime will 'interrupt' the quiz if
+// it's still going
+func timeQuiz(quizTimer *time.Timer, c chan string) {
+	<-quizTimer.C
+	fmt.Println("\nTimer has run out!")
+	c <- "timeout"
+}
+
+// proctorQuiz performs the quiz, asking the user questions and gathering responses. When it finishes, it sends
+// a "success" message down the channel to be returned to the calling function
+func proctorQuiz(q *Quiz, reader *bufio.Reader, c chan string) {
+	for index, value := range q.Questions {
+		if value.QuestionText != "" {
+			fmt.Print("\n\tQuestion ", index + 1, ":", "\t\t" + value.QuestionText + " = ")
+
+			userAnswer, inputErr := reader.ReadString('\n')
+			if inputErr == nil {
+				userAnswer = strings.Replace(userAnswer, "\n", "", 1)
+			} else {
+				fmt.Println("An error has occurred reading user input: ", inputErr)
+			}
+
+			result := userAnswer == value.Answer
+			if result {
+				fmt.Println("\tCorrect!")
+				q.CorrectQuestions++
+			} else {
+				fmt.Println("\tIncorrect.")
+			}
+			value.Correct = &result
+			value.UserAnswer = userAnswer
+			q.Questions[index] = value
+		}
+	}
+	c <- "success"
+}
 
 // Results takes a Quiz and performs the processing needed to determine the % of correct answers
 func (q Quiz) Results() string {
