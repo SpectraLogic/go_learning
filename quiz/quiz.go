@@ -7,7 +7,6 @@ package quiz
 import (
 	"bufio"
 	"encoding/csv"
-	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -83,12 +82,7 @@ func (q *Quiz) Start(maxQuizTime time.Duration, random bool) error {
 		return err
 	}
 
-	completed := make(chan bool)
-
-	time.AfterFunc(maxQuizTime, func() {
-		fmt.Println("\nTimer has run out!")
-		completed <- false
-	})
+	completed := make(chan string)
 
 	if random {
 		go proctorRandomQuiz(q, reader, completed)
@@ -96,25 +90,28 @@ func (q *Quiz) Start(maxQuizTime time.Duration, random bool) error {
 		go proctorQuiz(q, reader, completed)
 	}
 
-	if <-completed {
-		return nil
-	} else {
-		errorText := fmt.Sprintf("The quiz timer (%v seconds) ran out before the user completed the quiz",
+	timeout := time.NewTimer(maxQuizTime)
+	defer timeout.Stop()
+
+	select {
+	case <-timeout.C:
+		return fmt.Errorf("the quiz timer (%v seconds) ran out before the user completed the quiz",
 			maxQuizTime)
-		return errors.New(errorText)
+	case <-completed:
+		return nil
 	}
 }
 
 // proctorQuiz performs the quiz, asking the user questions and gathering responses. When it finishes, it sends
 // a "success" message down the channel to be returned to the calling function
-func proctorQuiz(q *Quiz, reader *bufio.Reader, c chan bool) {
+func proctorQuiz(q *Quiz, reader *bufio.Reader, c chan string) {
 	for index, value := range q.Questions {
 		processQuestion(reader, &value, q, index)
 	}
-	c <- false
+	c <- "done"
 }
 
-func proctorRandomQuiz(q *Quiz, reader *bufio.Reader, c chan bool) {
+func proctorRandomQuiz(q *Quiz, reader *bufio.Reader, c chan string) {
 	questionNumber := 1
 	for len(q.Questions) > 0 {
 		// gather a random index to get a random question
@@ -131,7 +128,7 @@ func proctorRandomQuiz(q *Quiz, reader *bufio.Reader, c chan bool) {
 		processQuestion(reader, &randomQuestion, q, questionNumber)
 		questionNumber++
 	}
-	c <- true
+	c <- "done"
 }
 
 func processQuestion(reader *bufio.Reader, question *Question, quiz *Quiz, questionNumber int) {
