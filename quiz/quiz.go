@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -37,7 +38,7 @@ func NewQuiz(filename string) (*Quiz, error) {
 		return nil, err
 	}
 
-	defer func(){
+	defer func() {
 		if csvErr := csvFile.Close(); csvErr != nil {
 			fmt.Println(csvErr)
 		}
@@ -108,7 +109,7 @@ func (q Quiz) Print() (err error) {
 
 // Start begins the user-input portion of the quiz. Each Question is presented to the user and they enter answers via
 // stdin with "\n" being used to specify the end of an answer.
-func (q *Quiz) Start(maxQuizTime int) error {
+func (q *Quiz) Start(maxQuizTime time.Duration, random bool) error {
 	fmt.Printf("\nYou will have %v seconds to answer %v questions.\nPress [Enter] to Start the quiz.\n",
 		maxQuizTime, q.TotalQuestions)
 
@@ -120,7 +121,11 @@ func (q *Quiz) Start(maxQuizTime int) error {
 
 	c := make(chan string)
 	go timeQuiz(maxQuizTime, c)
-	go proctorQuiz(q, reader, c)
+	if random {
+		go proctorRandomQuiz(q, reader, c)
+	} else {
+		go proctorQuiz(q, reader, c)
+	}
 
 	if <-c == "success" {
 		return nil
@@ -134,10 +139,10 @@ func (q *Quiz) Start(maxQuizTime int) error {
 // timeQuiz waits on the maxQuizTime and sends a "timeout" string down the channel when it is expired.
 // takeAndTimeQuiz returns the first thing down the channel, so the maxQuizTime will 'interrupt' the quiz if
 // it's still going
-func timeQuiz(maxQuizTime int, c chan string) {
-	fmt.Printf("Starting timer for %v seconds.\n", maxQuizTime)
-	time.AfterFunc(30 * time.Second, func() {
-		fmt.Println("\nTimer has run out!"); c <- "timeout"
+func timeQuiz(maxQuizTime time.Duration, c chan string) {
+	time.AfterFunc(maxQuizTime, func() {
+		fmt.Println("\nTimer has run out!")
+		c <- "timeout"
 	})
 }
 
@@ -145,29 +150,54 @@ func timeQuiz(maxQuizTime int, c chan string) {
 // a "success" message down the channel to be returned to the calling function
 func proctorQuiz(q *Quiz, reader *bufio.Reader, c chan string) {
 	for index, value := range q.Questions {
-		if value.QuestionText != "" {
-			fmt.Print("\n\tQuestion ", index + 1, ":", "\t\t" + value.QuestionText + " = ")
-
-			userAnswer, inputErr := reader.ReadString('\n')
-			if inputErr == nil {
-				userAnswer = strings.Replace(userAnswer, "\n", "", 1)
-			} else {
-				fmt.Println("An error has occurred reading user input: ", inputErr)
-			}
-
-			result := userAnswer == value.Answer
-			if result {
-				fmt.Println("\tCorrect!")
-				q.CorrectQuestions++
-			} else {
-				fmt.Println("\tIncorrect.")
-			}
-			value.Correct = &result
-			value.UserAnswer = userAnswer
-			q.Questions[index] = value
-		}
+		processQuestion(reader, &value, q, index)
 	}
 	c <- "success"
+}
+
+func proctorRandomQuiz(q *Quiz, reader *bufio.Reader, c chan string) {
+	questionNumber := 1
+	for len(q.Questions) > 0 {
+		// gather a random index to get a random question
+		randomIndex := rand.Intn(len(q.Questions))
+
+		// store the random question
+		randomQuestion := q.Questions[randomIndex]
+
+		// remove the random question from the Questions slice
+		frontSlice := q.Questions[0:randomIndex]
+		backSlice := q.Questions[randomIndex+1 : len(q.Questions)]
+		q.Questions = append(frontSlice, backSlice...)
+
+		processQuestion(reader, &randomQuestion, q, questionNumber)
+		questionNumber++
+	}
+	c <- "success"
+}
+
+func processQuestion(reader *bufio.Reader, question *Question, quiz *Quiz, questionNumber int) {
+	if question.QuestionText != "" {
+		fmt.Print("\n\tQuestion ", questionNumber, ":", "\t\t"+question.QuestionText+" = ")
+
+		userAnswer, inputErr := reader.ReadString('\n')
+		if inputErr == nil {
+			userAnswer = strings.Replace(userAnswer, "\n", "", 1)
+		} else {
+			fmt.Println("An error has occurred reading user input: ", inputErr)
+		}
+
+		userAnswer = strings.TrimSpace(userAnswer)
+		userAnswer = strings.ToLower(userAnswer)
+		result := userAnswer == strings.ToLower(question.Answer)
+		if result {
+			fmt.Println("\tCorrect!")
+			quiz.CorrectQuestions++
+		} else {
+			fmt.Println("\tIncorrect.")
+		}
+		question.Correct = &result
+		question.UserAnswer = userAnswer
+	}
 }
 
 // Results takes a Quiz and performs the processing needed to determine the % of correct answers
