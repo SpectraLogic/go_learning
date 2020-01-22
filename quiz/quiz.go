@@ -118,13 +118,8 @@ func (q *Quiz) Start(maxQuizTime int) error {
 		return err
 	}
 
-	// start the maxQuizTime
-	fmt.Printf("Starting timer for %v seconds.\n", maxQuizTime)
-	quizTimer := time.NewTimer(time.Duration(maxQuizTime) * time.Second)
-	defer quizTimer.Stop()
-
 	c := make(chan string)
-	go timeQuiz(quizTimer, c)
+	go timeQuiz(maxQuizTime, c)
 	go proctorQuiz(q, reader, c)
 
 	if <-c == "success" {
@@ -139,10 +134,11 @@ func (q *Quiz) Start(maxQuizTime int) error {
 // timeQuiz waits on the maxQuizTime and sends a "timeout" string down the channel when it is expired.
 // takeAndTimeQuiz returns the first thing down the channel, so the maxQuizTime will 'interrupt' the quiz if
 // it's still going
-func timeQuiz(quizTimer *time.Timer, c chan string) {
-	<-quizTimer.C
-	fmt.Println("\nTimer has run out!")
-	c <- "timeout"
+func timeQuiz(maxQuizTime int, c chan string) {
+	fmt.Printf("Starting timer for %v seconds.\n", maxQuizTime)
+	time.AfterFunc(30 * time.Second, func() {
+		fmt.Println("\nTimer has run out!"); c <- "timeout"
+	})
 }
 
 // proctorQuiz performs the quiz, asking the user questions and gathering responses. When it finishes, it sends
