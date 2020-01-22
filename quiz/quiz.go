@@ -25,8 +25,8 @@ type Quiz struct {
 	CorrectQuestions int
 }
 
-// NewQuiz creates a new Quiz struct based on the information in the file at the given file name
-func NewQuiz(filename string) (*Quiz, error) {
+// New creates a new Quiz struct based on the information in the file at the given file name
+func New(filename string) (*Quiz, error) {
 	fmt.Println("\nGetting quiz using file:\t", filename)
 
 	// open the file and save Question to a Quiz struct
@@ -83,20 +83,20 @@ func (q *Quiz) Start(maxQuizTime time.Duration, random bool) error {
 		return err
 	}
 
-	c := make(chan string)
+	completed := make(chan bool)
 
 	time.AfterFunc(maxQuizTime, func() {
 		fmt.Println("\nTimer has run out!")
-		c <- "timeout"
+		completed <- false
 	})
 
 	if random {
-		go proctorRandomQuiz(q, reader, c)
+		go proctorRandomQuiz(q, reader, completed)
 	} else {
-		go proctorQuiz(q, reader, c)
+		go proctorQuiz(q, reader, completed)
 	}
 
-	if <-c == "success" {
+	if <-completed {
 		return nil
 	} else {
 		errorText := fmt.Sprintf("The quiz timer (%v seconds) ran out before the user completed the quiz",
@@ -107,14 +107,14 @@ func (q *Quiz) Start(maxQuizTime time.Duration, random bool) error {
 
 // proctorQuiz performs the quiz, asking the user questions and gathering responses. When it finishes, it sends
 // a "success" message down the channel to be returned to the calling function
-func proctorQuiz(q *Quiz, reader *bufio.Reader, c chan string) {
+func proctorQuiz(q *Quiz, reader *bufio.Reader, c chan bool) {
 	for index, value := range q.Questions {
 		processQuestion(reader, &value, q, index)
 	}
-	c <- "success"
+	c <- false
 }
 
-func proctorRandomQuiz(q *Quiz, reader *bufio.Reader, c chan string) {
+func proctorRandomQuiz(q *Quiz, reader *bufio.Reader, c chan bool) {
 	questionNumber := 1
 	for len(q.Questions) > 0 {
 		// gather a random index to get a random question
@@ -131,7 +131,7 @@ func proctorRandomQuiz(q *Quiz, reader *bufio.Reader, c chan string) {
 		processQuestion(reader, &randomQuestion, q, questionNumber)
 		questionNumber++
 	}
-	c <- "success"
+	c <- true
 }
 
 func processQuestion(reader *bufio.Reader, question *Question, quiz *Quiz, questionNumber int) {

@@ -17,7 +17,7 @@ func main() {
 		"The amount of time in seconds that the user has to complete the quiz.")
 	flag.Parse()
 
-	newQuiz, err := quiz.NewQuiz(*filename)
+	newQuiz, err := quiz.New(*filename)
 	errorHandler(err)
 
 	duration := time.Duration(*timerDuration) * time.Second
