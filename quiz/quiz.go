@@ -85,9 +85,9 @@ func (q *Quiz) Start(maxQuizTime time.Duration, random bool) error {
 	completed := make(chan string)
 
 	if random {
-		go proctorRandomQuiz(q, reader, completed)
+		go q.proctorRandomQuiz(reader, completed)
 	} else {
-		go proctorQuiz(q, reader, completed)
+		go q.proctorQuiz(reader, completed)
 	}
 
 	timeout := time.NewTimer(maxQuizTime)
@@ -104,14 +104,14 @@ func (q *Quiz) Start(maxQuizTime time.Duration, random bool) error {
 
 // proctorQuiz performs the quiz, asking the user questions and gathering responses. When it finishes, it sends
 // a "success" message down the channel to be returned to the calling function
-func proctorQuiz(q *Quiz, reader *bufio.Reader, c chan string) {
+func (q *Quiz) proctorQuiz(reader *bufio.Reader, c chan string) {
 	for index, value := range q.Questions {
-		processQuestion(reader, &value, q, index)
+		q.processQuestion(reader, &value, index)
 	}
 	c <- "done"
 }
 
-func proctorRandomQuiz(q *Quiz, reader *bufio.Reader, c chan string) {
+func (q *Quiz) proctorRandomQuiz(reader *bufio.Reader, c chan string) {
 	questionNumber := 1
 	for len(q.Questions) > 0 {
 		// gather a random index to get a random question
@@ -125,13 +125,13 @@ func proctorRandomQuiz(q *Quiz, reader *bufio.Reader, c chan string) {
 		backSlice := q.Questions[randomIndex+1 : len(q.Questions)]
 		q.Questions = append(frontSlice, backSlice...)
 
-		processQuestion(reader, &randomQuestion, q, questionNumber)
+		q.processQuestion(reader, &randomQuestion, questionNumber)
 		questionNumber++
 	}
 	c <- "done"
 }
 
-func processQuestion(reader *bufio.Reader, question *Question, quiz *Quiz, questionNumber int) {
+func (q *Quiz) processQuestion(reader *bufio.Reader, question *Question, questionNumber int) {
 	if question.QuestionText != "" {
 		fmt.Print("\n\tQuestion ", questionNumber, ":", "\t\t"+question.QuestionText+" = ")
 
@@ -147,7 +147,7 @@ func processQuestion(reader *bufio.Reader, question *Question, quiz *Quiz, quest
 		result := userAnswer == strings.ToLower(question.Answer)
 		if result {
 			fmt.Println("\tCorrect!")
-			quiz.CorrectQuestions++
+			q.CorrectQuestions++
 		} else {
 			fmt.Println("\tIncorrect.")
 		}
@@ -157,9 +157,8 @@ func processQuestion(reader *bufio.Reader, question *Question, quiz *Quiz, quest
 }
 
 // Results takes a Quiz and performs the processing needed to determine the % of correct answers
-func (q Quiz) Results() string {
+func (q *Quiz) Results() string {
 	correct, total := float64(q.CorrectQuestions), float64(q.TotalQuestions)
 	ratio := 100 * (correct / total)
-	percent := "%"
-	return fmt.Sprintf("%2.2f%v (%v/%v) of the answers were correct.", ratio, percent, correct, total)
+	return fmt.Sprintf("%2.2f%% (%v/%v) of the answers were correct.", ratio, correct, total)
 }
