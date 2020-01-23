@@ -85,10 +85,11 @@ func (q *Quiz) Start(maxQuizTime time.Duration, random bool) error {
 	completed := make(chan string)
 
 	if random {
-		go q.proctorRandomQuiz(reader, completed)
-	} else {
-		go q.proctorQuiz(reader, completed)
+		rand.Shuffle(len(q.Questions), func(i, j int) {
+			q.Questions[i], q.Questions[j] = q.Questions[j], q.Questions[i]
+		})
 	}
+	go q.proctorQuiz(reader, completed)
 
 	timeout := time.NewTimer(maxQuizTime)
 	defer timeout.Stop()
@@ -106,27 +107,7 @@ func (q *Quiz) Start(maxQuizTime time.Duration, random bool) error {
 // a "success" message down the channel to be returned to the calling function
 func (q *Quiz) proctorQuiz(reader *bufio.Reader, c chan string) {
 	for index, value := range q.Questions {
-		q.processQuestion(reader, &value, index)
-	}
-	c <- "done"
-}
-
-func (q *Quiz) proctorRandomQuiz(reader *bufio.Reader, c chan string) {
-	questionNumber := 1
-	for len(q.Questions) > 0 {
-		// gather a random index to get a random question
-		randomIndex := rand.Intn(len(q.Questions))
-
-		// store the random question
-		randomQuestion := q.Questions[randomIndex]
-
-		// remove the random question from the Questions slice
-		frontSlice := q.Questions[0:randomIndex]
-		backSlice := q.Questions[randomIndex+1 : len(q.Questions)]
-		q.Questions = append(frontSlice, backSlice...)
-
-		q.processQuestion(reader, &randomQuestion, questionNumber)
-		questionNumber++
+		q.processQuestion(reader, &value, index+1)
 	}
 	c <- "done"
 }
