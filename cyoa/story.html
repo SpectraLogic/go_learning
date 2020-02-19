@@ -1,0 +1,21 @@
+<html>
+    <head>
+        <title>{{.Title}}</title>
+    </head>
+    <body>
+        <h1>{{.Title}}</h1>
+
+        {{range .Story}}
+            <p>{{ . }}</p>
+        {{else}}
+            <p><strong>--- no story lines ---</strong></p>
+        {{end}}
+
+        <h2>What do you want to do?</h2>
+        {{range .Options}}
+            <p><a href="/{{ .Arc }}">{{ .Text }}</a></p>
+        {{else}}
+            <p><strong>--- done ---</strong></p>
+        {{end}}
+    </body>
+</html>
