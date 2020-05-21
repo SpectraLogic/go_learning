@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"go_learning/urlshort"
+	"github.com/SwarnaLathaNatarajan/go_learning/urlshort"
 )
 
 func main() {
@@ -23,7 +23,7 @@ func main() {
 - path: /urlshort
   url: https://github.com/gophercises/urlshort
 - path: /urlshort-final
-  url: https://github.com/gophercises/urlshort/tree/solution
+  url: https://github.com/gophercises/urlshort/tree/final
 `
 	yamlHandler, err := urlshort.YAMLHandler([]byte(yaml), mapHandler)
 	if err != nil {
