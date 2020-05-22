@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"go_learning/urlshort"
+	"github.com/SwarnaLathaNatarajan/go_learning/urlshort"
 )
 
 func main() {
